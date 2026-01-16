@@ -31,8 +31,11 @@ class InitiatePaymentView(views.APIView):
         
         try:
             # Create Razorpay Order
+            # FIX: Use Decimal for precision, avoid float
+            from decimal import Decimal
+            amount_decimal = Decimal(str(amount))
             data = {
-                "amount": int(float(amount) * 100), # Amount in paise
+                "amount": int(amount_decimal * 100), # Amount in paise
                 "currency": "INR",
                 "payment_capture": "1"
             }
@@ -52,7 +55,9 @@ class InitiatePaymentView(views.APIView):
                 'key_id': config.key_id
             })
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # FIX: Do not leak internal exception details
+            print(f"Payment Error: {e}") # Log it internally
+            return Response({'error': 'Payment initiation failed. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class PaymentCallbackView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -92,3 +97,28 @@ class PaymentCallbackView(views.APIView):
             except:
                 pass
             return Response({'error': 'Signature Verification Failed'}, status=status.HTTP_400_BAD_REQUEST)
+class IsInternalService(permissions.BasePermission):
+    """
+    Allows access only to internal services with the correct secret key.
+    """
+    def has_permission(self, request, view):
+        import os
+        internal_key = os.getenv('INTERNAL_SERVICE_KEY')
+        request_key = request.headers.get('X-Internal-Secret')
+        return internal_key and request_key == internal_key
+
+class RetrieveTransactionView(views.APIView):
+    permission_classes = [IsInternalService]
+
+    def get(self, request, payment_id):
+        try:
+            transaction = Transaction.objects.get(payment_id=payment_id)
+            return Response({
+                'payment_id': transaction.payment_id,
+                'order_id': transaction.order_id,
+                'amount': transaction.amount,
+                'status': transaction.status,
+                'currency': transaction.currency
+            })
+        except Transaction.DoesNotExist:
+             return Response({'error': 'Transaction not found'}, status=status.HTTP_404_NOT_FOUND)

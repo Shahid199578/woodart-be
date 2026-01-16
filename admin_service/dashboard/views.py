@@ -4,17 +4,36 @@ from .models import SiteConfig, Policy, FAQ
 from .serializers import SiteConfigSerializer, PolicySerializer, FAQSerializer
 
 class IsAdminUser(permissions.BasePermission):
+    """
+    Strict Admin-only access.
+    """
     def has_permission(self, request, view):
-        # Allow Read-only for everyone (or specific frontend service), Write for Admin
-        if request.method in permissions.SAFE_METHODS:
-            return True
         try:
-             return request.user.is_authenticated and request.user.token.get('role') == 'admin'
+             # FIX: Use request.auth
+             if hasattr(request, 'auth') and isinstance(request.auth, dict):
+                 return request.auth.get('role') == 'admin'
+             if request.auth and hasattr(request.auth, 'get'):
+                  return request.auth.get('role') == 'admin'
+             return False
         except:
              return False
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Read-only for everyone, Admin for unsafe methods.
+    """
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        try:
+             if hasattr(request, 'auth') and hasattr(request.auth, 'get'):
+                 return request.auth.get('role') == 'admin'
+        except:
+             pass
+        return False
+
 class DashboardStatsView(views.APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser] # Strict
 
     def get(self, request):
         # In a real microservice, this would query api-gateway or other services
@@ -29,7 +48,7 @@ class DashboardStatsView(views.APIView):
 class SiteConfigViewSet(viewsets.ModelViewSet):
     queryset = SiteConfig.objects.all()
     serializer_class = SiteConfigSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrReadOnly] # Public Read
 
     def get_object(self):
         # Singleton pattern for SiteConfig
@@ -45,10 +64,10 @@ class SiteConfigViewSet(viewsets.ModelViewSet):
 class PolicyViewSet(viewsets.ModelViewSet):
     queryset = Policy.objects.all()
     serializer_class = PolicySerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrReadOnly]
 
 class FAQViewSet(viewsets.ModelViewSet):
     queryset = FAQ.objects.all()
     serializer_class = FAQSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrReadOnly]
 

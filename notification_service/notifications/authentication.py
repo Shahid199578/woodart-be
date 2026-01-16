@@ -20,7 +20,7 @@ class StatelessJWTAuthentication(BaseAuthentication):
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed('Token expired')
         except jwt.InvalidTokenError as e:
-            # logger.error(f"Invalid Token: {e}, Key: {settings.SECRET_KEY}")
+            logger.error(f"Invalid Token: {e}")
             raise AuthenticationFailed('Invalid token')
 
         # Create a dummy user

@@ -1,7 +1,7 @@
 from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
-from .views import ProductList, ProductDetail, CategoryList, CategoryDetail, PartnerList, PartnerDetail, UploadImage
+from .views import ProductList, ProductDetail, CategoryList, CategoryDetail, PartnerList, PartnerDetail, UploadImage, DeductStockView, RefundStockView
 
 urlpatterns = [
     path('products/', ProductList.as_view(), name='product-list'),

@@ -14,7 +14,10 @@ class IsAdminOrReadOnly(permissions.BasePermission):
             return True
         # Check simplejwt token role
         try:
-             return request.user.is_authenticated and request.user.token.get('role') == 'admin'
+             # FIX: Use request.auth
+             if hasattr(request, 'auth') and hasattr(request.auth, 'get'):
+                 return request.auth.get('role') == 'admin'
+             return False
         except:
              return False
 
@@ -27,7 +30,18 @@ class UploadImage(APIView):
         if not file_obj:
             return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
         
-        file_name = default_storage.save(file_obj.name, file_obj)
+        # FIX: Validate extension
+        import os
+        import uuid
+        ext = os.path.splitext(file_obj.name)[1].lower()
+        allowed_exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        if ext not in allowed_exts:
+             return Response({"error": "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # FIX: Randomize filename
+        new_filename = f"{uuid.uuid4()}{ext}"
+        
+        file_name = default_storage.save(new_filename, file_obj)
         file_url = default_storage.url(file_name)
         
         return Response({"url": file_url}, status=status.HTTP_201_CREATED)
@@ -39,7 +53,14 @@ class BlogPostList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         # Admin sees all, users see published
-        if self.request.user.is_authenticated and getattr(self.request.user, 'token', {}).get('role') == 'admin':
+        is_admin = False
+        try:
+            if self.request.auth and hasattr(self.request.auth, 'get'):
+                is_admin = self.request.auth.get('role') == 'admin'
+        except:
+            pass
+            
+        if is_admin:
             return BlogPost.objects.all().order_by('-created_at')
         return BlogPost.objects.filter(is_published=True).order_by('-created_at')
 

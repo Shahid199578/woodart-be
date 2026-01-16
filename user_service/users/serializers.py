@@ -4,12 +4,21 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
+from django.utils.html import escape
+
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    role = serializers.CharField(read_only=True) # FIX: Prevent Privilege Escalation
 
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'full_name', 'role', 'brand_name', 'gst_number', 'mobile', 'business_address', 'warehouse_address', 'password')
+
+    def validate_username(self, value): return escape(value)
+    def validate_full_name(self, value): return escape(value)
+    def validate_brand_name(self, value): return escape(value)
+    def validate_business_address(self, value): return escape(value)
+    def validate_warehouse_address(self, value): return escape(value)
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
@@ -28,6 +37,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('email', 'username', 'password', 'full_name')
+
+    def validate_username(self, value): return escape(value)
+    def validate_full_name(self, value): return escape(value)
 
     def create(self, validated_data):
         user = User.objects.create_user(

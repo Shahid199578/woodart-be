@@ -10,7 +10,10 @@ class CreateOrderView(views.APIView):
 
     def post(self, request):
         items = request.data.get('items', [])
-        shipping_address = request.data.get('shippingAddress', '')
+        
+        # FIX: Sanitize Shipping Address (Stored XSS)
+        from django.utils.html import escape
+        shipping_address = escape(request.data.get('shippingAddress', ''))
         
         # B2B Fields
         is_b2b = request.data.get('isB2B', False)
@@ -23,32 +26,52 @@ class CreateOrderView(views.APIView):
         total_amount = Decimal('0.00')
         order_items_data = []
 
-        # Validate Prices & Stock
-        for item in items:
-            product_id = item.get('id') or item.get('product_id')
-            quantity = item.get('quantity', 1)
-            
-            product_data = get_product_details(product_id)
-            if not product_data:
-                return Response({'error': f'Product {product_id} not found'}, status=status.HTTP_404_NOT_FOUND)
-            
-            price = Decimal(str(product_data['price']))
-            line_total = price * quantity
-            total_amount += line_total
-            
-            order_items_data.append({
-                'product_id': product_id,
-                'product_name': product_data['name'],
-                'quantity': quantity,
-                'price': price
-            })
+        # Validate Prices & Stock & Deduct
+        import requests
+        import os
+        product_service_url = settings.PRODUCT_SERVICE_URL
+        internal_key = os.getenv('INTERNAL_SERVICE_KEY')
+        deducted_items = []
 
-        # Calculate Payment Amount
-        charge_amount = total_amount
-        if is_b2b:
-            charge_amount = (total_amount * partial_percentage) / 100
-        
         try:
+            for item in items:
+                product_id = item.get('id') or item.get('product_id')
+                quantity = item.get('quantity', 1)
+                
+                # 1. Get Details
+                product_data = get_product_details(product_id)
+                if not product_data:
+                    raise Exception(f"Product {product_id} not found")
+                
+                price = Decimal(str(product_data['price']))
+                line_total = price * quantity
+                total_amount += line_total
+                
+                # 2. Atomic Deduct
+                deduct_resp = requests.post(
+                    f"{product_service_url}/products/{product_id}/deduct/",
+                    json={'quantity': quantity},
+                    headers={'X-Internal-Secret': internal_key},
+                    timeout=5
+                )
+                
+                if deduct_resp.status_code != 200:
+                    raise Exception(f"Product {product_data['name']} is Out of Stock")
+                
+                deducted_items.append({'product_id': product_id, 'quantity': quantity})
+
+                order_items_data.append({
+                    'product_id': product_id,
+                    'product_name': product_data['name'],
+                    'quantity': quantity,
+                    'price': price
+                })
+
+            # Calculate Payment Amount
+            charge_amount = total_amount
+            if is_b2b:
+                charge_amount = (total_amount * partial_percentage) / 100
+            
             # Create Order Record with Pending Status
             order = Order.objects.create(
                 user_id=request.user.id,
@@ -76,6 +99,21 @@ class CreateOrderView(views.APIView):
                 'payableAmount': charge_amount,
                 'currency': 'INR'
             })
+            
+        except Exception as e:
+            # Compensating Transaction: Refund all deducted items
+            for d_item in deducted_items:
+                try:
+                     requests.post(
+                        f"{product_service_url}/products/{d_item['product_id']}/refund/",
+                        json={'quantity': d_item['quantity']},
+                        headers={'X-Internal-Secret': internal_key},
+                        timeout=3
+                    )
+                except:
+                    print(f"CRITICAL: Failed to refund item {d_item['product_id']}")
+                    
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -93,6 +131,42 @@ class ConfirmOrderPaymentView(views.APIView):
         try:
             order = Order.objects.get(id=order_id, user_id=request.user.id)
             
+            # FIX: Verify Payment with Payment Service
+            import requests
+            import os
+            
+            payment_service_url = os.getenv('PAYMENT_SERVICE_URL', 'http://woodcraft-payment-service:8007')
+            internal_key = os.getenv('INTERNAL_SERVICE_KEY')
+            
+            # FIX: Prevent Double Spending (Replay Attack)
+            if Order.objects.filter(stripe_payment_id=payment_id).exclude(id=order.id).exists():
+                return Response({'error': 'Payment ID already used by another order'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                verify_resp = requests.get(
+                    f"{payment_service_url}/api/transactions/{payment_id}/",
+                    headers={'X-Internal-Secret': internal_key},
+                    timeout=5
+                )
+                
+                if verify_resp.status_code != 200:
+                    return Response({'error': 'Payment verification failed'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                payment_data = verify_resp.json()
+                
+                # Check 1: Status Success
+                if payment_data.get('status') != 'success':
+                     return Response({'error': 'Payment transaction failed or pending'}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Check 2: Amount Match (allow small float diff if necessary, but we moved to Decimal so strict check)
+                paid_amount = Decimal(str(payment_data.get('amount')))
+                if paid_amount < order.paid_amount:
+                     return Response({'error': f'Insufficient payment. Paid: {paid_amount}, Due: {order.paid_amount}'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            except Exception as e:
+                print(f"Payment Verification Error: {e}")
+                return Response({'error': 'Could not verify payment'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             # Update Status
             order.status = 'partial_paid' if order.is_b2b else 'paid'
             order.stripe_payment_id = payment_id # Storing Razorpay ID in existing field for now (rename later if needed)

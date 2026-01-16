@@ -1,5 +1,6 @@
 from rest_framework import views, status, permissions, generics
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from django.conf import settings
 from google import genai
 from google.genai import types
@@ -9,7 +10,13 @@ from .serializers import AIConfigSerializer
 
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
-        return getattr(request.user, 'token', {}).get('role') == 'admin'
+        # FIX: Check request.auth for role claims
+        try:
+             if hasattr(request, 'auth') and hasattr(request.auth, 'get'):
+                 return request.auth.get('role') == 'admin'
+        except:
+             pass
+        return False
 
 class AIConfigView(generics.RetrieveUpdateAPIView):
     queryset = AIConfig.objects.all()
@@ -22,6 +29,7 @@ class AIConfigView(generics.RetrieveUpdateAPIView):
 
 class ChatView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
 
     def post(self, request):
         message = request.data.get('message', '')
@@ -46,4 +54,6 @@ class ChatView(views.APIView):
             return Response({'response': response.text})
         except Exception as e:
             # Fallback if API fails or quota exceeded
-            return Response({'response': f"Forgive me, my tools are momentarily misplaced. ({str(e)})"}, status=200)
+            # FIX: Do not leak exception details to user
+            print(f"AI Service Error: {e}") 
+            return Response({'response': "Forgive me, my tools are momentarily misplaced. (Service Busy)"}, status=200)
