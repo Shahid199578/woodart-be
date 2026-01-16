@@ -2,4 +2,4 @@ venv
 .env
 __pycache__
 migrate.sh
-start_server.sh
+start_servers.sh
