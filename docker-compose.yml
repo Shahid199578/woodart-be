@@ -3,8 +3,10 @@ version: '3.8'
 services:
   db:
     image: postgres:15
+    container_name: woodcraft-db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: always
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
@@ -16,6 +18,7 @@ services:
 
   user-service:
     build: ./user_service
+    container_name: woodcraft-user-service
     command: gunicorn user_project.wsgi:application --bind 0.0.0.0:8001
     ports:
       - "8001:8001"
@@ -25,9 +28,11 @@ services:
       - db
     volumes:
       - ./user_service:/app
+    restart: always
 
   product-service:
     build: ./product_service
+    container_name: woodcraft-product-service
     command: gunicorn product_project.wsgi:application --bind 0.0.0.0:8002
     ports:
       - "8002:8002"
@@ -38,9 +43,11 @@ services:
     depends_on:
       - user-service
       - db
+    restart: always
 
   order-service:
     build: ./order_service
+    container_name: woodcraft-order-service
     command: gunicorn order_project.wsgi:application --bind 0.0.0.0:8003
     ports:
       - "8003:8003"
@@ -52,9 +59,11 @@ services:
       - notification-service
       - product-service
       - db
+    restart: always
 
   ai-service:
     build: ./ai_service
+    container_name: woodcraft-ai-service
     command: gunicorn ai_project.wsgi:application --bind 0.0.0.0:8004
     ports:
       - "8004:8004"
@@ -64,9 +73,11 @@ services:
       - ./ai_service:/app
     depends_on:
       - db
+    restart: always
 
   admin-service:
     build: ./admin_service
+    container_name: woodcraft-admin-service
     command: gunicorn admin_project.wsgi:application --bind 0.0.0.0:8005
     ports:
       - "8005:8005"
@@ -77,9 +88,11 @@ services:
       - ./media:/app/media
     depends_on:
       - db
+    restart: always
 
   notification-service:
     build: ./notification_service
+    container_name: woodcraft-notification-service
     command: gunicorn notification_project.wsgi:application --bind 0.0.0.0:8006
     ports:
       - "8006:8006"
@@ -89,9 +102,11 @@ services:
       - ./notification_service:/app
     depends_on:
       - db
+    restart: always
 
   payment-service:
     build: ./payment_service
+    container_name: woodcraft-payment-service
     command: gunicorn payment_project.wsgi:application --bind 0.0.0.0:8007
     ports:
       - "8007:8007"
@@ -101,9 +116,11 @@ services:
       - ./payment_service:/app
     depends_on:
       - db
+    restart: always
 
   blog-service:
     build: ./blog_service
+    container_name: woodcraft-blog-service
     command: gunicorn blog_service.wsgi:application --bind 0.0.0.0:8008
     ports:
       - "8008:8008"
@@ -113,6 +130,7 @@ services:
       - ./blog_service:/app
     depends_on:
       - db
+    restart: always
 
 volumes:
   postgres_data:
