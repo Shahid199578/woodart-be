@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Helvetica', sans-serif;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+        }
+
+        .header {
+            background: #1a1a1a;
+            color: #d4af37;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .details {
+            margin: 20px 0;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+
+        .total {
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Invoice #{{ order_id }}</h2>
+        </div>
+        <div class="details">
+            <p><strong>Date:</strong> {{ date }}</p>
+            <p><strong>Customer:</strong> {{ name }}</p>
+        </div>
+        <h3>Items</h3>
+        {% for item in items %}
+        <div class="item">
+            <span>{{ item.quantity }}x {{ item.name }}</span>
+            <span>Rs {{ item.price }}</span>
+        </div>
+        {% endfor %}
+        <div class="total">
+            Total: Rs {{ total }}
+        </div>
+        <p>Thank you for your business.</p>
+    </div>
+</body>
+
+</html>

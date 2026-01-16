@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            color: #333;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #d4af37;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-family: 'Times New Roman', serif;
+            margin: 0;
+            color: #1a1a1a;
+            letter-spacing: 2px;
+        }
+
+        .header span {
+            color: #d4af37;
+        }
+
+        /* Gold */
+        .content {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .footer {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #1a1a1a;
+            color: #d4af37;
+            padding: 10px 20px;
+            text-decoration: none;
+            margin-top: 20px;
+            border: 1px solid #d4af37;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>A TO Z <span>WoodArt</span></h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ name }},</p>
+            <p>Welcome to A TO Z WoodArt. We are honored to have you as a member of our exclusive community of woodcraft
+                enthusiasts.</p>
+            <p>Your account has been successfully created. You can now explore our curated collection of masterpieces
+                and manage your orders.</p>
+            <p style="text-align: center;">
+                <a href="http://localhost:5173/login" class="btn">Access My Account</a>
+            </p>
+        </div>
+        <div class="footer">
+            &copy; 2026 A TO Z WoodArt. All rights reserved.
+        </div>
+    </div>
+</body>
+
+</html>
